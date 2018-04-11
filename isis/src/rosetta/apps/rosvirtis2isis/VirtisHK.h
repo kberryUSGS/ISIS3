@@ -26,7 +26,7 @@
 
 namespace Isis {
 /**
- * Represents a Rosetta Virtis Housekeeping (HK) entry.
+ * Represents an individual Rosetta Virtis Housekeeping (HK) entry.
  * 
  * @author 2017-05-27 Kristin Berry 
  *  

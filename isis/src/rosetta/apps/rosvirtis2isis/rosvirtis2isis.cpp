@@ -24,6 +24,7 @@ using namespace Isis;
 
 // helper functions
 QByteArray pvlFix(QString fileName);
+Table createHouseKeepingTable(std::vector< char * > hkData);
 int word(const char byte1, const char byte2);
 int swapb(const unsigned short int word);
 double translateScet(int word1, int word2, int word3);
@@ -61,10 +62,10 @@ void IsisMain ()
 
   // NULL pixels are set to 65535 in the input QUB
   p.SetNull(65535, 65535);
+  // Still need to check -- I think HIS y LIS are flagged, as well
 
   Cube *outcube = p.SetOutputCube ("TO");
 
-  // Is this a correctly-formatted Rosetta VIRTIS-M file? (VIRTIS-H is not currently supported)
   QString instid, missid, channelid;
 
   try {
@@ -89,13 +90,95 @@ void IsisMain ()
     throw IException(IException::Unknown, msg, _FILEINFO_);
   }
 
+  // A processing level of 2 indicates an uncalibrated .QUB file with a housekeeping table.
+  // A processing level of 3 indicates a calibrated .QUB without a housekeeping table.
+  int procLevel = (int) pdsLabel.findKeyword("PROCESSING_LEVEL_ID"); 
+
   // Override default DataTrailerBytes constructed from PDS header
   // Will this number ever change? Where did this # come from?
-  p.SetDataTrailerBytes(864);
+
+  if (procLevel == 2) {
+    p.SetDataTrailerBytes(864); 
+  }
 
   p.StartProcess();
 
-  // Retrieve HK settings file and read in HK values.
+  if (procLevel == 2) {
+    std::vector<char *> hkData = p.DataTrailer(); 
+    Table table = createHouseKeepingTable(hkData); 
+    outcube->write(table);
+  }
+
+  // Get the directory where the Rosetta translation tables are.
+  PvlGroup dataDir (Preference::Preferences().findGroup("DataDirectory"));
+  QString transDir = (QString) dataDir["Rosetta"] + "/translations/";
+
+  // Create a PVL to store the translated labels in
+  Pvl outLabel;
+
+  // Translate the Archive group
+  FileName transFile = transDir + "virtisArchive.trn";
+  PvlToPvlTranslationManager archiveXlater (pdsLabel, transFile.expanded());
+  archiveXlater.Auto(outLabel);
+
+  // Translate the Instrument group
+  transFile = transDir + "virtisInstruments.trn";
+  PvlToPvlTranslationManager instrumentXlater (pdsLabel, transFile.expanded());
+  instrumentXlater.Auto(outLabel);
+
+  // Write the Archive and Instrument groups to the output cube label
+  outcube->putGroup(outLabel.findGroup("Archive", Pvl::Traverse));
+  outcube->putGroup(outLabel.findGroup("Instrument", Pvl::Traverse));
+
+  // Add correct kernels and output Kernel group for VIRTIS_M IR vs. VIS.
+  // VIRTIS_H is also supported.
+  PvlGroup kerns("Kernels");
+  if (channelid == "VIRTIS_M_IR") {
+    kerns += PvlKeyword("NaifFrameCode", toString(-226213));
+  }
+  else if (channelid == "VIRTIS_M_VIS") {
+    kerns += PvlKeyword("NaifFrameCode", toString(-226211));
+  }
+  else if (channelid == "VIRTIS_H") {
+    kerns += PvlKeyword("NaifFrameCode", toString(-226220));
+  }
+  else {
+    QString msg = "Input file [" + inFile.expanded() + "] has an invalid " +
+                 "InstrumentId.";
+    throw IException(IException::Unknown, msg, _FILEINFO_);
+  }
+  outcube->putGroup(kerns);
+
+  p.EndProcess ();
+}
+
+
+/**
+ * 
+ * Populate the Housekeeping table
+ *  
+ *  There are 3 categories of VIRTIS HK Values, in terms of converting from input byte to output
+ *  value:
+ * 
+ *  (1) SCET (many-to-one)
+ *  (2) Physical Quantities (one-to-one)
+ *  (3) Flags or Statistics (one-to-many)
+ * 
+ *  SCET values are made up of 3 VIRTIS HK 2-byte words. The output value can be calculated
+ *  using the translateScet helper function.
+ * 
+ *  Physical values are made up of 1 VIRTIS HK 2-byte word, which is converted to a physical value
+ *  using an equation specified as a series of coefficients in the associated "assets" file.
+ * 
+ *  For Flags or Statistics Values, 1 VIRTIS HK 2-byte word is associated with several (a varaible
+ *  number of) output Flag or Statistics values. These are all treated as special cases.
+ * 
+ *  Additionally, Sine and Cosine HK Values need to be pre-processed before conversion, but are
+ *  otherwise treated as a normal "Physical Quantity" HK.
+ * 
+ */
+Table createHouseKeepingTable(std::vector< char * > hkData) {
+ // Retrieve HK settings file and read in HK values.
   QList<VirtisHK> hk;
 
   // Get the directory where the Rosetta translation tables are.
@@ -111,6 +194,7 @@ void IsisMain ()
     throw IException(IException::Io,msg, _FILEINFO_);
   }
 
+  // Should this get moved to Pvl for consistency? 
   QTextStream in(&hkFile);
 
   while(!in.atEnd()) {
@@ -134,7 +218,7 @@ void IsisMain ()
     rec += tableFields[i];
   }
 
-  Table table("VIRTISHouseKeeping", rec);
+Table table("VIRTISHouseKeeping", rec);
 
   // VIRTIS-M (VIS and IR) Equations
   // These are adapted from the VIRTIS IDL processing pipeline
@@ -150,28 +234,6 @@ void IsisMain ()
     equations.append(PolynomialUnivariate(2, equationList[s]));
   }
 
-  // Populate the Housekeeping table
-  //
-  // There are 3 categories of VIRTIS HK Values, in terms of converting from input byte to output
-  // value:
-  //
-  // (1) SCET (many-to-one)
-  // (2) Physical Quantities (one-to-one)
-  // (3) Flags or Statistics (one-to-many)
-  //
-  // SCET values are made up of 3 VIRTIS HK 2-byte words. The output value can be calculated
-  // using the translateScet helper function.
-  //
-  // Physical values are made up of 1 VIRTIS HK 2-byte word, which is converted to a physical value
-  // using an equation specified as a series of coefficients in the associated "assets" file.
-  //
-  // For Flags or Statistics Values, 1 VIRTIS HK 2-byte word is associated with several (a varaible
-  // number of) output Flag or Statistics values. These are all treated as special cases.
-  //
-  // Additionally, Sine and Cosine HK Values need to be pre-processed before conversion, but are
-  // otherwise treated as a normal "Physical Quantity" HK.
-  //
-  std::vector< char * > hkData = p.DataTrailer();
   for (unsigned int i=0; i < hkData.size() ; i++) {
     const char *hk = hkData.at(i);
     const unsigned short *uihk = reinterpret_cast<const unsigned short *> (hk);
@@ -235,7 +297,6 @@ void IsisMain ()
             rec[tableNum+2] = 1.0* ((int)(temp/256) & 1);
             tableNum+=2;
           }
-
           else if (tableNum == 65) { // M_VIS_FLAG
             rec[tableNum] = 1.0* ((int)(temp/1) & 1);
             rec[tableNum+1] = 1.0* ((int)(temp/2) & 1);
@@ -314,47 +375,7 @@ void IsisMain ()
     }
     table += rec;
   }
-
-  outcube->write(table);
-
-
-  // Create a PVL to store the translated labels in
-  Pvl outLabel;
-
-  // Translate the Archive group
-  FileName transFile = transDir + "virtisArchive.trn";
-  PvlToPvlTranslationManager archiveXlater (pdsLabel, transFile.expanded());
-  archiveXlater.Auto(outLabel);
-
-  // Translate the Instrument group
-  transFile = transDir + "virtisInstruments.trn";
-  PvlToPvlTranslationManager instrumentXlater (pdsLabel, transFile.expanded());
-  instrumentXlater.Auto(outLabel);
-
-  // Write the Archive and Instrument groups to the output cube label
-  outcube->putGroup(outLabel.findGroup("Archive", Pvl::Traverse));
-  outcube->putGroup(outLabel.findGroup("Instrument", Pvl::Traverse));
-
-  // Add correct kernels and output Kernel group for VIRTIS_M IR vs. VIS.
-  // VIRTIS_H is also supported.
-  PvlGroup kerns("Kernels");
-  if (channelid == "VIRTIS_M_IR") {
-    kerns += PvlKeyword("NaifFrameCode", toString(-226213));
-  }
-  else if (channelid == "VIRTIS_M_VIS") {
-    kerns += PvlKeyword("NaifFrameCode", toString(-226211));
-  }
-  else if (channelid == "VIRTIS_H") {
-    kerns += PvlKeyword("NaifFrameCode", toString(-226220));
-  }
-  else {
-    QString msg = "Input file [" + inFile.expanded() + "] has an invalid " +
-                 "InstrumentId.";
-    throw IException(IException::Unknown, msg, _FILEINFO_);
-  }
-  outcube->putGroup(kerns);
-
-  p.EndProcess ();
+  return table;
 }
 
 
@@ -419,6 +440,10 @@ double translateScet(int word1, int word2, int word3)
 bool isValid(int word){
   return word != 65535;
 }
+
+
+
+
 
 
 /**
