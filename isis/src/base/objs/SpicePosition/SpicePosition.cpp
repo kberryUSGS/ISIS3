@@ -1220,10 +1220,6 @@ namespace Isis {
    *            method)
    */
   void SpicePosition::SetEphemerisTimeMemcache() {
-    // need to use the eal cube reader to get in the times and associated positions and velocities
-//    std::vector< std::vector<double> > tableData = ale::readPositionTable(tablesfromLabel, cubeFile); 
-//    std::vector<double> position = ale::getPosition(tableData[0], tableData[1], p_et, ale::interpolation::linear);
-
     // If the cache has only one position return it
     if(p_cache.size() == 1) {
       p_coordinate[0] = p_cache[0][0];
@@ -1236,8 +1232,9 @@ namespace Isis {
         p_velocity[2] = p_cacheVelocity[0][2];
       }
     }
-
     else {
+      //p_coordinate = ale::getPosition(p_cache, p_cacheTime, p_et, ale::linear);
+      //p_velocity = ale::getVelocity(p_cacheVelocity, p_cacheTime, p_et, ale::linear);
       // Otherwise determine the interval to interpolate
       std::vector<double>::iterator pos;
       pos = upper_bound(p_cacheTime.begin(), p_cacheTime.end(), p_et);
@@ -1376,7 +1373,44 @@ namespace Isis {
    *   @history 2018 - temporary update to demonstrate use of ale in one function - Kristin Berry
    */
   void SpicePosition::SetEphemerisTimePolyFunction() {
-    // This is the time that the polynomial is fit over
+// Create the empty functions
+    Isis::PolynomialUnivariate functionX(p_degree);
+    Isis::PolynomialUnivariate functionY(p_degree);
+    Isis::PolynomialUnivariate functionZ(p_degree);
+
+    // Load the coefficients to define the functions
+    functionX.SetCoefficients(p_coefficients[0]);
+    functionY.SetCoefficients(p_coefficients[1]);
+    functionZ.SetCoefficients(p_coefficients[2]);
+
+    // Normalize the time
+    double rtime;
+    rtime = (p_et - p_baseTime) / p_timeScale;
+
+    // Evaluate the polynomials at current et to get position;
+    p_coordinate[0] = functionX.Evaluate(rtime);
+    p_coordinate[1] = functionY.Evaluate(rtime);
+    p_coordinate[2] = functionZ.Evaluate(rtime);
+
+    if(p_hasVelocity) {
+
+      if( p_degree == 0) {
+        p_velocity = p_cacheVelocity[0];
+      }
+      else { 
+        p_velocity[0] = ComputeVelocityInTime(WRT_X);
+        p_velocity[1] = ComputeVelocityInTime(WRT_Y);
+        p_velocity[2] = ComputeVelocityInTime(WRT_Z);
+      }
+        
+//         p_velocity[0] = functionX.DerivativeVar(rtime);
+//         p_velocity[1] = functionY.DerivativeVar(rtime);
+//         p_velocity[2] = functionZ.DerivativeVar(rtime);
+    }
+  }
+
+
+/*    // This is the time that the polynomial is fit over
     double rtime;
     rtime = (p_et - p_baseTime) / p_timeScale;
 
@@ -1391,7 +1425,6 @@ namespace Isis {
         p_velocity = p_cacheVelocity[0];
       }
       else {
-
         // The velocity is computed with respect to time, rather than scaled time, so update the 
         // coefficients to be passed int othe ale::getVelocity function 
         std::vector< std::vector<double> > velocityCoefficients;
@@ -1416,10 +1449,18 @@ namespace Isis {
         std::reverse(velocityCoefficients[1].begin(), velocityCoefficients[1].end());
         std::reverse(velocityCoefficients[2].begin(), velocityCoefficients[2].end());
 
-        p_velocity = ale::getVelocity(velocityCoefficients, p_et - p_baseTime);
+       // p_velocity = ale::getVelocity(velocityCoefficients, p_et - p_baseTime);
+        if( p_degree == 0) {
+          p_velocity = p_cacheVelocity[0];
+        }
+        else { 
+        p_velocity[0] = ComputeVelocityInTime(WRT_X);
+        p_velocity[1] = ComputeVelocityInTime(WRT_Y);
+        p_velocity[2] = ComputeVelocityInTime(WRT_Z);
       }
+     }
     }
-  }
+  }*/
 
 
   /**
