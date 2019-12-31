@@ -62,7 +62,7 @@ node("${env.OS.toLowerCase()}") {
         env.STAGE_STATUS = "Creating conda environment"
         
         if (env.OS.toLowerCase() == "mac") {
-          condaPath = "/tmp/" + sh(script: '{ date "+%H:%M:%S:%m"; echo $WORKSPACE; } | md5 | tr -d "\n";', returnStdout: true) 
+          condaPath = "/tmp/" + sh(script: '{ date "+%m/%d/%y|%H:%M:%S:%m"; echo $WORKSPACE; } | md5 | tr -d "\n";', returnStdout: true) 
 
           sh """
             curl -o miniconda.sh  https://repo.continuum.io/miniconda/Miniconda3-latest-MacOSX-x86_64.sh
@@ -83,17 +83,19 @@ node("${env.OS.toLowerCase()}") {
           sh """
               # Use the conda cache running on the Jenkins host
               # conda config --set channel_alias http://dmz-jenkins.wr.usgs.gov
-              which conda
               conda config --set always_yes True
               conda config --set ssl_verify false 
-              conda create -n isis python=3
+              conda update -n base -c defaults conda
           """
            
           
           if (env.OS.toLowerCase() == "centos") {
-              sh 'conda env update -n isis -f environment_gcc4.yml --prune'
+              sh 'conda env create -n isis -f environment_gcc4.yml'
           } else {
-            sh "conda env update -n isis -f environment.yml --prune"
+            sh """
+                conda config --show channels
+                conda env create -n isis -f environment.yml
+            """
           }
        } 
     } 
