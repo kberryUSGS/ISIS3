@@ -228,14 +228,14 @@ find_package(Qt5 COMPONENTS
                 # Search this path explicitly for MacOS OpenGL Framework
                 PATHS /System/Library/Frameworks/ REQUIRED)
 
-find_package(Boost 1.59.0 REQUIRED atomic
+find_package(Boost REQUIRED atomic
                                         log
                                         regex
                                         log_setup
                                         serialization
                                         chrono
                                         math_c99
-                                        signals
+#                                        signals
                                         container
                                         math_c99f
                                         context

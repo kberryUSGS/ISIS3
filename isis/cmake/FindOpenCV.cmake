@@ -6,6 +6,7 @@
 #   OPENCV_LIBLSIT
 
 find_path(OPENCV_INCLUDE_DIR
+#    NAMES core.hpp
     NAMES cv.h
     PATH_SUFFIXES opencv "opencv4/opencv2"
 )
