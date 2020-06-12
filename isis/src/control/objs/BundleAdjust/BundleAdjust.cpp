@@ -583,6 +583,7 @@ namespace Isis {
 
     // testing not using metis
     m_cholmodCommon.nmethods = 1;
+    m_cholmodCommon.print = 5;
     m_cholmodCommon.method[0].ordering = CHOLMOD_AMD;
 
     return true;
@@ -1555,6 +1556,11 @@ namespace Isis {
     // TODO should we analyze just 1st iteration?
     m_L = cholmod_analyze(m_cholmodNormal, &m_cholmodCommon);
 
+    // PRINT OUT ALL THE INFORMATION WE HAVE: 
+    cholmod_print_common("Common", &m_cholmodCommon);
+    cholmod_print_factor(m_L, "Factor", &m_cholmodCommon);
+    cholmod_print_sparse(m_cholmodNormal, "SparseMatrix", &m_cholmodCommon);
+
     // create cholmod cholesky factor
     // CHOLMOD will choose LLT or LDLT decomposition based on the characteristics of the matrix.
     cholmod_factorize(m_cholmodNormal, m_L, &m_cholmodCommon);
@@ -1629,10 +1635,15 @@ namespace Isis {
     double *tripletValues = (double*)m_cholmodTriplet->x;
 
     double entryValue;
+    double transEntryValue;
+    bool symmetric = true;
 
     int numEntries = 0;
 
     int numBlockcolumns = m_sparseNormals.size();
+
+//    m_sparseNormals.print(std::cerr); 
+
     for (int columnIndex = 0; columnIndex < numBlockcolumns; columnIndex++) {
 
       SparseBlockColumnMatrix *normalsColumn = m_sparseNormals[columnIndex];
@@ -1653,9 +1664,24 @@ namespace Isis {
 
         int rowIndex = it.key();
 
+
         // note: as the normal equations matrix is symmetric, the # of leading rows for a block is
         //       equal to the # of leading columns for a block column at the "rowIndex" position
         int numLeadingRows = m_sparseNormals.at(rowIndex)->startColumn();
+
+//        std::cout << "Num leading rows: " << numLeadingRows << std::endl; 
+
+        SparseBlockColumnMatrix *transNormalsColumn = m_sparseNormals[rowIndex]; 
+
+//        transNormalsColumn->print(std::cerr);
+
+        LinearAlgebra::Matrix *transNormalsBlock;
+        if (transNormalsColumn != NULL) {
+          transNormalsBlock = transNormalsColumn->value(columnIndex); 
+        }
+        else {
+          symmetric = false;
+        }
 
         LinearAlgebra::Matrix *normalsBlock = it.value();
         if ( !normalsBlock ) {
@@ -1675,6 +1701,13 @@ namespace Isis {
           for (unsigned ii = 0; ii < normalsBlock->size1(); ii++) {
             for (unsigned jj = ii; jj < normalsBlock->size2(); jj++) {
               entryValue = normalsBlock->at_element(ii,jj);
+              if (transNormalsBlock != NULL) {
+                transEntryValue = transNormalsBlock->at_element(jj, ii); 
+                symmetric = symmetric && (entryValue == transEntryValue);
+              }
+              else{
+                symmetric = false; 
+              }
               int entryColumnIndex = jj + numLeadingColumns;
               int entryRowIndex = ii + numLeadingRows;
 
@@ -1694,6 +1727,13 @@ namespace Isis {
           for (unsigned ii = 0; ii < normalsBlock->size1(); ii++) {
             for (unsigned jj = 0; jj < normalsBlock->size2(); jj++) {
               entryValue = normalsBlock->at_element(ii,jj);
+              if (transNormalsBlock != NULL) {
+                transEntryValue = transNormalsBlock->at_element(jj, ii); 
+                symmetric = symmetric && (entryValue == transEntryValue);
+              }
+              else {
+                symmetric = false; 
+              }
               int entryColumnIndex = jj + numLeadingColumns;
               int entryRowIndex = ii + numLeadingRows;
 
@@ -1711,6 +1751,12 @@ namespace Isis {
         }
       }
     }
+
+    std::cout << "Matrix is ";
+    if (!symmetric) {
+        std::cout << "not";
+    }
+    std::cout << "symmetric." << std::endl;
 
     return true;
   }
