@@ -242,7 +242,7 @@ namespace Isis {
       it.next();
 
       if( it.value() )
-        outstream << it.key() << std::endl << *(it.value()) << std::endl
+        outstream << "row block # " << it.key() << std::endl << *(it.value()) << std::endl
                   << std::endl;
       else
         outstream << "NULL block pointer at row[" << IString(it.key())
@@ -1006,11 +1006,14 @@ namespace Isis {
     for( int i = 0; i < size(); i++ ) {
       SparseBlockColumnMatrix* column = at(i);
 
-      if ( column )
+      if ( column ) {
+        std::cout << "column block #: " << i << std::endl;
         column->print(outstream);
-      else
+      }
+      else{
         outstream << "NULL column pointer at column[" << IString(i)
                   << "]!" << std::endl;
+      }
     }
   }
 
@@ -1029,11 +1032,14 @@ namespace Isis {
     for( int i = 0; i < size(); i++ ) {
       SparseBlockColumnMatrix* column = at(i);
 
-      if ( column )
+      if ( column ){
+        std::cout << "column block #: " << i << std::endl;
         column->printClean(outstream);
-      else
+      }
+      else{
         outstream << "NULL column pointer at column[" << IString(i)
                   << "]!" << std::endl;
+      }
     }
   }
 

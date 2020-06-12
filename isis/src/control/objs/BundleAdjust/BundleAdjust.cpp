@@ -532,9 +532,9 @@ namespace Isis {
    *                           printed to stdout. References #4313.
    */
   bool BundleAdjust::validateNetwork() {
-
+     
     outputBundleStatus("\nValidating network...");
-
+    
     int imagesWithInsufficientMeasures = 0;
     QString msg = "Images with one or less measures:\n";
     int numObservations = m_bundleObservations.size();
@@ -559,7 +559,7 @@ namespace Isis {
     }
 
     outputBundleStatus("\nValidation complete!...\n");
-
+    
     return true;
   }
 
@@ -622,7 +622,7 @@ namespace Isis {
         observation++;
       }
     }
-    else {
+    else {     
       for (int i = 0; i < nBlockColumns; i++) {
         m_sparseNormals.at(i)->setStartColumn(nParameters);
         nParameters += m_bundleObservations.at(i)->numberParameters();
@@ -947,9 +947,9 @@ namespace Isis {
 
       if (m_bundleResults.converged() && m_bundleSettings->errorPropagation()) {
         clock_t errorPropStartClock = clock();
-
+        
         outputBundleStatus("\nStarting Error Propagation");
-
+        
         errorPropagation();
         emit statusUpdate("\n\nError Propagation Complete\n");
         clock_t errorPropStopClock = clock();
@@ -1061,7 +1061,7 @@ namespace Isis {
     int num3DPoints = m_bundleControlPoints.size();
 
     outputBundleStatus("\n\n");
-
+    
     for (int i = 0; i < num3DPoints; i++) {
       emit(pointUpdate(i+1));
       BundleControlPointQsp point = m_bundleControlPoints.at(i);
@@ -1547,16 +1547,33 @@ namespace Isis {
     }
 
     // convert triplet to sparse matrix
+    std::cerr << "creating m_cholmodNormal" << std::endl;
     m_cholmodNormal = cholmod_triplet_to_sparse(m_cholmodTriplet,
                                                 m_cholmodTriplet->nnz,
                                                 &m_cholmodCommon);
 
     // analyze matrix
     // TODO should we analyze just 1st iteration?
+    std::cerr << "creating m_L" << std::endl;
+    std::cerr << "m_cholmodNormal nrow: " << m_cholmodNormal->nrow;
+    std::cerr << std::endl;
+    std::cerr << "m_cholmodNormal ncol: " << m_cholmodNormal->ncol;
+    std::cerr << std::endl;
+    std::cerr << "m_cholmodNormal nzmax: " << m_cholmodNormal->nzmax;
+    std::cerr << std::endl;
+    std::cerr << "m_cholmodNormal xtype: " << m_cholmodNormal->xtype;
+    std::cerr << std::endl;
     m_L = cholmod_analyze(m_cholmodNormal, &m_cholmodCommon);
 
     // create cholmod cholesky factor
     // CHOLMOD will choose LLT or LDLT decomposition based on the characteristics of the matrix.
+    std::cerr << "m_L n (size -> n by n): " << m_L->n;
+    std::cerr << std::endl;
+    std::cerr << "m_L nzmax: " << m_L->nzmax;
+    std::cerr << std::endl;
+    std::cerr << "m_L xtype: " << m_L->xtype;
+    std::cerr << std::endl;
+
     cholmod_factorize(m_cholmodNormal, m_L, &m_cholmodCommon);
 
     // check for "matrix not positive definite" error
@@ -1567,6 +1584,8 @@ namespace Isis {
       emit(finished());
       return false;
     }
+
+    std::cout << "CHOMOMOD" << m_cholmodCommon.status << std::endl; 
 
     // cholmod solution and right-hand side vectors
     cholmod_dense *x, *b;
@@ -1629,16 +1648,56 @@ namespace Isis {
     double *tripletValues = (double*)m_cholmodTriplet->x;
 
     double entryValue;
+    double transEntryValue;
 
+    bool symmetric = true;
+
+    //##############################################################
+    std::cout << "BEGINNING OF DEBUG CODE" << std::endl;
+    std::cout << "Size of Normal Matrix: " << m_sparseNormals.size() << std::endl;
+    std::cout << "Block row 0 block indices: ";
+    for (int i = 0; i < m_sparseNormals.size(); i++) {
+        if(m_sparseNormals[i] -> contains(4)){
+            std::cout << i << " ";
+        }
+    }
+    std::cout << std::endl;
+
+    std::cout << "Block column 38 block indices: ";
+//    QMapIterator< int, LinearAlgebra::Matrix * > testIt(*m_sparseNormals[38]);
+    QMapIterator< int, LinearAlgebra::Matrix * > testIt(*m_sparseNormals[4]);
+
+    while ( testIt.hasNext() ){
+        testIt.next();
+        std::cout << testIt.key() << " ";
+    } 
+    std::cout << std::endl;
+
+
+//    std::cout << "SPARSEBLOCKCOLUMNMATRIX: " << std::endl; 
+    int numBlockcolumns = m_sparseNormals.size();
+    m_sparseNormals.print(std::cerr);
+
+    /*for (int i=0; i < numBlockcolumns; i++) {
+      std::cout << "I: " << i << std::endl; 
+      m_sparseNormals[i]->printClean(std::cerr);
+      std::cout << std::endl; 
+      m_sparseNormals[i]->print(std::cerr);
+      std::cout << std::endl; 
+    }*/
+
+    std::cout << "END OF DEBUG CODE" << std::endl;
+    //##############################################################
     int numEntries = 0;
 
-    int numBlockcolumns = m_sparseNormals.size();
     for (int columnIndex = 0; columnIndex < numBlockcolumns; columnIndex++) {
+      std::cout << "BA.cpp ln 1658: columnIndex";
+      std::cout << columnIndex << std::endl;
 
       SparseBlockColumnMatrix *normalsColumn = m_sparseNormals[columnIndex];
 
       if ( !normalsColumn ) {
-        QString status = "\nSparseBlockColumnMatrix retrieval failure at column " +
+        QString status = "\nSparseBlockColumnMatrix retrieval failure at column " + 
                          QString::number(columnIndex);
         outputBundleStatus(status);
         return false;
@@ -1648,10 +1707,19 @@ namespace Isis {
 
       QMapIterator< int, LinearAlgebra::Matrix * > it(*normalsColumn);
 
+      // HERE
       while ( it.hasNext() ) {
         it.next();
 
         int rowIndex = it.key();
+
+        std::cout << "columnIndex: " << columnIndex << std::endl;
+        std::cout << "rowIndex: " << rowIndex << std::endl;
+        SparseBlockColumnMatrix *transNormalsColumn = m_sparseNormals[rowIndex];
+
+        std::cout << "TRANS_NORMALS_COLUMN: ";
+//        transNormalsColumn->print(std::cerr); 
+//        LinearAlgebra::Matrix *transNormalsBlock = transNormalsColumn->value(columnIndex);
 
         // note: as the normal equations matrix is symmetric, the # of leading rows for a block is
         //       equal to the # of leading columns for a block column at the "rowIndex" position
@@ -1675,6 +1743,11 @@ namespace Isis {
           for (unsigned ii = 0; ii < normalsBlock->size1(); ii++) {
             for (unsigned jj = ii; jj < normalsBlock->size2(); jj++) {
               entryValue = normalsBlock->at_element(ii,jj);
+//              transEntryValue = transNormalsBlock->at_element(jj,ii);
+              std::cout << "(ii, jj): " << ii << "," << jj << std::endl; 
+              std::cout << "Diagnoal Block: (entryValue, transEntryValue) : " << entryValue << "," << transEntryValue << std::endl; 
+              symmetric = symmetric && (entryValue == transEntryValue);
+
               int entryColumnIndex = jj + numLeadingColumns;
               int entryRowIndex = ii + numLeadingRows;
 
@@ -1693,7 +1766,17 @@ namespace Isis {
         else {                // off-diagonal block (square)
           for (unsigned ii = 0; ii < normalsBlock->size1(); ii++) {
             for (unsigned jj = 0; jj < normalsBlock->size2(); jj++) {
+              std::cout << "BA.cpp ln 1730: iterating over off-diagonal block" << std::endl;
+//              std::cout << "normalsBlock size: " << normalsBlock->size1() << " " << normalsBlock->size2();
+              std::cout << std::endl;
+//              std::cout << "transNormalsBlock size: " << transNormalsBlock->size1() << " " << transNormalsBlock->size2();
+              std::cout << std::endl;
+              std::cout << "(ii, jj): " << ii << ", " << jj << std::endl;
               entryValue = normalsBlock->at_element(ii,jj);
+//              transEntryValue = transNormalsBlock->at_element(jj,ii);
+              std::cout << "BA.cpp ln 1733: created transEntryValue" << std::endl;
+  //            symmetric = symmetric && (entryValue == transEntryValue);
+              std::cout << "BA.cpp ln 1735: updated symmetric" << std::endl;
               int entryColumnIndex = jj + numLeadingColumns;
               int entryRowIndex = ii + numLeadingRows;
 
@@ -1711,6 +1794,12 @@ namespace Isis {
         }
       }
     }
+
+    std::cout << "Matrix is ";
+    if (!symmetric) {
+        std::cout << "not";
+    }
+    std::cout << "symmetric." << std::endl;
 
     return true;
   }
@@ -2116,7 +2205,7 @@ namespace Isis {
 
       t += numTargetBodyParameters;
     }
-
+       
     // Update spice for each BundleObservation
     int numObservations = m_bundleObservations.size();
     for (int i = 0; i < numObservations; i++) {
@@ -2134,10 +2223,10 @@ namespace Isis {
     }
     // TODO - When BundleXYZ gets merged into dev, go with Ken's version of merging the updating of
     //              of the adjusted surface point into BundleControlPoint.
-
+    
     int pointIndex = 0;
     int numControlPoints = m_bundleControlPoints.size();
-
+    
     for (int i = 0; i < numControlPoints; i++) {
       BundleControlPointQsp point = m_bundleControlPoints.at(i);
 
@@ -2147,7 +2236,7 @@ namespace Isis {
       }
 
       point->applyParameterCorrections(m_imageSolution, m_sparseNormals,
-                                       m_bundleTargetBody);
+                                       m_bundleTargetBody); 
       pointIndex++;
 
     } // end loop over point corrections
@@ -2374,14 +2463,14 @@ namespace Isis {
       status.append(QString("%1").arg(medianDev));
       status.append("\n");
       outputBundleStatus(status);
-
+      
       mad = 1.4826 * medianDev;
 
       status = "\nmad: ";
       status.append(QString("%1").arg(mad));
       status.append("\n");
       outputBundleStatus(status);
-
+      
       m_bundleResults.setRejectionLimit(median
                                         + m_bundleSettings->outlierRejectionMultiplier() * mad);
 
@@ -2389,7 +2478,7 @@ namespace Isis {
       status.append(QString("%1").arg(m_bundleResults.rejectionLimit()));
       status.append("\n");
       outputBundleStatus(status);
-
+      
       return true;
   }
 
@@ -2416,7 +2505,7 @@ namespace Isis {
     int numComingBack = 0;
 
     int numObjectPoints = m_bundleControlPoints.size();
-
+    
     outputBundleStatus("\n");
     for (int i = 0; i < numObjectPoints; i++) {
       BundleControlPointQsp point = m_bundleControlPoints.at(i);
@@ -2512,14 +2601,14 @@ namespace Isis {
     status.append(QString("%1").arg(usedRejectionLimit));
     status.append(")\n");
     outputBundleStatus(status);
-
+    
     m_bundleResults.setNumberRejectedObservations(numberRejectedObservations);
 
     status = "\nMeasures that came back: ";
     status.append(QString("%1").arg(numComingBack));
     status.append("\n");
     outputBundleStatus(status);
-
+         
     return true;
   }
 
@@ -2573,11 +2662,11 @@ namespace Isis {
    *                           us to create the inverse matrix correlation file. References #4315.
    *   @history 2016-10-28 Ian Humphrey - Added extra newline between Error Propagation: Inverse
    *                           Blocking and Filling point covariance messages. References #4463.
-   *   @history 2018-09-06 Debbie A. Cook and Ken Edmundson - (added to BundleXYZ
-   *                            branch on (2018-05-31).  Moved productAlphaAV and control point
-   *                            parameter correction code to BundleControlPoint.  Earlier revised
-   *                            errorPropagation to compute the sigmas via the variance/
-   *                            covariance matrices instead of the sigmas.  This should produce
+   *   @history 2018-09-06 Debbie A. Cook and Ken Edmundson - (added to BundleXYZ 
+   *                            branch on (2018-05-31).  Moved productAlphaAV and control point 
+   *                            parameter correction code to BundleControlPoint.  Earlier revised 
+   *                            errorPropagation to compute the sigmas via the variance/ 
+   *                            covariance matrices instead of the sigmas.  This should produce 
    *                            more accurate results.  References #4649 and #501.
    */
   bool BundleAdjust::errorPropagation() {
@@ -2587,7 +2676,7 @@ namespace Isis {
     cholmod_free_sparse(&m_cholmodNormal, &m_cholmodCommon);
 
     LinearAlgebra::Matrix T(3, 3);
-    // *** TODO ***
+    // *** TODO *** 
     // Can any of the control point specific code be moved to BundleControlPoint?
 
     double sigma0Squared = m_bundleResults.sigma0() * m_bundleResults.sigma0();
@@ -2595,12 +2684,12 @@ namespace Isis {
     int numObjectPoints = m_bundleControlPoints.size();
 
     std::string currentTime = iTime::CurrentLocalTime().toLatin1().data();
-
+    
     QString status = "     Time: ";
     status.append(currentTime.c_str());
     status.append("\n\n");
-    outputBundleStatus(status);
-
+    outputBundleStatus(status); 
+    
     // create and initialize array of 3x3 matrices for all object points
     std::vector< symmetric_matrix<double> > pointCovariances(numObjectPoints,
                                                              symmetric_matrix<double>(3));
@@ -2827,9 +2916,9 @@ namespace Isis {
     cholmod_free_dense(&b,&m_cholmodCommon);
 
     outputBundleStatus("\n\n");
-
+     
     currentTime = Isis::iTime::CurrentLocalTime().toLatin1().data();
-
+    
     status = "\rFilling point covariance matrices: Time ";
     status.append(currentTime.c_str());
     outputBundleStatus(status);
@@ -2860,17 +2949,17 @@ namespace Isis {
 
       // Update and reset the matrix
       // Get the Limiting Error Propagation uncertainties:  sigmas for coordinate 1, 2, and 3 in meters
-      //
+      // 
       SurfacePoint SurfacePoint = point->adjustedSurfacePoint();
 
-      // Get the TEP by adding the corresponding members of pCovar and covariance
+      // Get the TEP by adding the corresponding members of pCovar and covariance      
       boost::numeric::ublas::symmetric_matrix <double,boost::numeric::ublas::upper> pCovar;
-
+      
       if (m_bundleSettings->controlPointCoordTypeBundle() == SurfacePoint::Latitudinal) {
         pCovar = SurfacePoint.GetSphericalMatrix(SurfacePoint::Kilometers);
       }
       else {
-        // Assume Rectangular coordinates
+        // Assume Rectangular coordinates 
         pCovar = SurfacePoint.GetRectangularMatrix(SurfacePoint::Kilometers);
       }
       pCovar += covariance;
@@ -2884,14 +2973,14 @@ namespace Isis {
       //   std:: cout << "     sigmaRad (km) = " << sqrt(pCovar(2,2)) << std::endl;
       // std::cout <<  "      Adjusted matrix = " << std::endl;
       // std::cout << "       " << pCovar(0,0) << "   " << pCovar(0,1) << "   "
-      //           << pCovar(0,2) << std::endl;
+      //           << pCovar(0,2) << std::endl; 
       // std::cout << "        " << pCovar(1,0) << "   " << pCovar(1,1) << "   "
-      //           << pCovar(1,2) << std::endl;
+      //           << pCovar(1,2) << std::endl; 
       // std::cout << "        " << pCovar(2,0) << "   " << pCovar(2,1) << "   "
       //           << pCovar(2,2) << std::endl;
       // }
       // end debug
-
+      
       // Distance units are km**2
       SurfacePoint.SetMatrix(m_bundleSettings->controlPointCoordTypeBundle(),pCovar);
       point->setAdjustedSurfacePoint(SurfacePoint);
@@ -2899,7 +2988,7 @@ namespace Isis {
       // if (j < 3) {
       //   boost::numeric::ublas::symmetric_matrix <double,boost::numeric::ublas::upper> recCovar;
       //   recCovar = SurfacePoint.GetRectangularMatrix(SurfacePoint::Meters);
-      //   std:: cout << "     sigmaLat (meters) = " <<
+      //   std:: cout << "     sigmaLat (meters) = " << 
       //     point->adjustedSurfacePoint().GetSigmaDistance(SurfacePoint::Latitudinal,
       //     SurfacePoint::One).meters() << std::endl;
       //   std:: cout << "     sigmaLon (meters) = " <<
@@ -2908,9 +2997,9 @@ namespace Isis {
       //   std:: cout << "   sigmaRad (km) = " << sqrt(pCovar(2,2)) << std::endl;
       //   std::cout << "Rectangular matrix with radius in meters" << std::endl;
       //   std::cout << "       " << recCovar(0,0) << "   " << recCovar(0,1) << "   "
-      //           << recCovar(0,2) << std::endl;
+      //           << recCovar(0,2) << std::endl; 
       //   std::cout << "        " << recCovar(1,0) << "   " << recCovar(1,1) << "   "
-      //           << recCovar(1,2) << std::endl;
+      //           << recCovar(1,2) << std::endl; 
       //   std::cout << "        " << recCovar(2,0) << "   " << recCovar(2,1) << "   "
       //           << recCovar(2,2) << std::endl;
       // }
@@ -2921,7 +3010,7 @@ namespace Isis {
 
     return true;
   }
-
+  
 
   /**
    * Returns a pointer to the output control network.
@@ -3110,7 +3199,7 @@ namespace Isis {
    *                           -Wformat-security warning during the build.
    */
   void BundleAdjust::outputBundleStatus(QString status) {
-    if (QCoreApplication::applicationName() != "ipce") {
+    if (QCoreApplication::applicationName() != "ipce") { 
       printf("%s", status.toStdString().c_str());
     }
   }
@@ -3202,10 +3291,10 @@ namespace Isis {
       // Latitude or X
       Distance minSigmaCoord1Dist;
       QString  minSigmaCoord1PointId = "";
-
+      
       Distance maxSigmaCoord1Dist;
       QString  maxSigmaCoord1PointId = "";
-
+      
       // Longitude or Y
       Distance minSigmaCoord2Dist;
       QString  minSigmaCoord2PointId = "";
@@ -3219,7 +3308,7 @@ namespace Isis {
 
       Distance maxSigmaCoord3Dist;
       QString  maxSigmaCoord3PointId = "";
-
+      
       // compute stats for point sigmas
       Statistics sigmaCoord1Stats;
       Statistics sigmaCoord2Stats;

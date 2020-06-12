@@ -285,6 +285,8 @@ namespace Isis {
         progress->CheckStatus();
       }
     }
+    cerr << "number of graph edges: " << boost::num_edges(m_controlGraph) << endl;
+    cerr << "number of graph vertices: " << boost::num_vertices(m_controlGraph) << endl;
   }
 
 
