@@ -118,6 +118,7 @@ namespace Isis {
    *   @history 2011-02-08 Jeannie Walldren - Initialize pointers to null.
    */
   void Spice::init(Pvl &lab, bool noTables, json isd) {
+    std::cout << "NEW VERSION" << std::endl;
     NaifStatus::CheckErrors();
     // Initialize members
     
@@ -186,6 +187,7 @@ namespace Isis {
           throw IException(IException::Programmer, msg, _FILEINFO_);
         }
         
+        m_isd = isd;
         if (isd == NULL){
           // try using ALE
           std::ostringstream kernel_pvl;
@@ -194,7 +196,9 @@ namespace Isis {
           json props;
           props["kernels"] = kernel_pvl.str();
 
-          isd = ale::load(lab.fileName().toStdString(), props.dump(), "isis");
+          std::cout << "Using ISIS:"<< kernel_pvl.str() << std::endl; 
+          isd = ale::load(lab.fileName().toStdString(), props.dump(), "isis", true);
+          m_isd = isd;
         }
         
         json aleNaifKeywords = isd["NaifKeywords"];
@@ -379,9 +383,9 @@ namespace Isis {
     // Check to see if we have nadir pointing that needs to be computed &
     // See if we have table blobs to load 
     if (m_usingAle) {
-      m_sunPosition->LoadCache(isd["SunPosition"]);
-      m_bodyRotation->LoadCache(isd["BodyRotation"]);
-      solarLongitude();
+//      m_sunPosition->LoadCache(isd["SunPosition"]);
+//      m_bodyRotation->LoadCache(isd["BodyRotation"]);
+//      solarLongitude();
     }
     else if (kernels["TargetPosition"][0].toUpper() == "TABLE") {
       Table t("SunPosition", lab.fileName(), lab);
@@ -420,9 +424,9 @@ namespace Isis {
 
       m_instrumentRotation = new SpiceRotation(*m_ikCode, *m_spkBodyCode);
     }
-    else if (m_usingAle) {
-     m_instrumentRotation->LoadCache(isd["InstrumentPointing"]);
-    }
+//    else if (m_usingAle) {
+//     m_instrumentRotation->LoadCache(isd["InstrumentPointing"]);
+//    }
     else if (kernels["InstrumentPointing"][0].toUpper() == "TABLE") {
       Table t("InstrumentPointing", lab.fileName(), lab);
       m_instrumentRotation->LoadCache(t);
@@ -436,7 +440,8 @@ namespace Isis {
     }
     
     if (m_usingAle) {
-      m_instrumentPosition->LoadCache(isd["InstrumentPosition"]);
+//      m_instrumentPosition->LoadCache(isd["InstrumentPosition"]);
+      // CHECK OUT HERE
     }
     else if (kernels["InstrumentPosition"][0].toUpper() == "TABLE") {
       Table t("InstrumentPosition", lab.fileName(), lab);
@@ -621,6 +626,8 @@ namespace Isis {
    */
   void Spice::createCache(iTime startTime, iTime endTime,
       int cacheSize, double tol) {
+    std::cout << "IN CREATECACHE: " << std::endl;
+    std::cout << "Cachesize: " << cacheSize << std::endl;
     NaifStatus::CheckErrors();
 
     // Check for errors
@@ -656,35 +663,59 @@ namespace Isis {
     if (!m_bodyRotation->IsCached()) {
       int bodyRotationCacheSize = cacheSize;
       if (cacheSize > 2) bodyRotationCacheSize = 2;
-      m_bodyRotation->LoadCache(
-          startTime.Et() - *m_startTimePadding,
-          endTime.Et() + *m_endTimePadding,
-          bodyRotationCacheSize);
+
+      if (m_usingAle) {
+//        m_bodyRotation->LoadCache(m_isd["BodyRotation"]);
+      } else{
+        m_bodyRotation->LoadCache(
+            startTime.Et() - *m_startTimePadding,
+            endTime.Et() + *m_endTimePadding,
+            bodyRotationCacheSize);
+      }
     }
 
     if (m_instrumentRotation->GetSource() < SpiceRotation::Memcache) {
       if (cacheSize > 3) m_instrumentRotation->MinimizeCache(SpiceRotation::Yes);
-      m_instrumentRotation->LoadCache(
-          startTime.Et() - *m_startTimePadding,
-          endTime.Et() + *m_endTimePadding,
-          cacheSize);
+
+      if (m_usingAle) {
+//        m_instrumentRotation->LoadCache(m_isd["InstrumentPointing"]);
+      }
+      else{
+        m_instrumentRotation->LoadCache(
+            startTime.Et() - *m_startTimePadding,
+            endTime.Et() + *m_endTimePadding,
+            cacheSize);
+      }
     }
 
+    std::cout << "source for instr position is: " << m_instrumentPosition->GetSource() << std::endl;
+    std::cout << "source for instr position is: " << SpicePosition::Memcache << std::endl;
     if (m_instrumentPosition->GetSource() < SpicePosition::Memcache) {
-      m_instrumentPosition->LoadCache(
-          startTime.Et() - *m_startTimePadding,
-          endTime.Et() + *m_endTimePadding,
-          cacheSize);
+      if (m_usingAle) {
+        m_instrumentRotation->LoadCache(m_isd["InstrumentPosition"]);
+      }
+      else {
+        m_instrumentPosition->LoadCache(
+            startTime.Et() - *m_startTimePadding,
+            endTime.Et() + *m_endTimePadding,
+            cacheSize);
+      }
       if (cacheSize > 3) m_instrumentPosition->Memcache2HermiteCache(tol);
+      std::cout << "In here and cachesize: " << cacheSize << std::endl; 
     }
 
     if (!m_sunPosition->IsCached()) {
       int sunPositionCacheSize = cacheSize;
       if (cacheSize > 2) sunPositionCacheSize = 2;
-      m_sunPosition->LoadCache(
-          startTime.Et() - *m_startTimePadding,
-          endTime.Et() + *m_endTimePadding,
-          sunPositionCacheSize);
+      if (m_usingAle) {
+        m_instrumentRotation->LoadCache(m_isd["SunPosition"]);
+      }
+      else {
+        m_sunPosition->LoadCache(
+            startTime.Et() - *m_startTimePadding,
+            endTime.Et() + *m_endTimePadding,
+            sunPositionCacheSize);
+      }
     }
 
     // Save the time and cache size

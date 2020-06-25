@@ -253,6 +253,7 @@ namespace Isis {
       SetEphemerisTimeMemcache();
     }
     else if(p_source == HermiteCache) {
+      std::cout << "HermiteCache" <<std::endl;
       SetEphemerisTimeHermiteCache();
     }
     else if(p_source == PolyFunction) {
@@ -377,7 +378,7 @@ namespace Isis {
 
     p_hasVelocity = !p_cacheVelocity.empty();
     p_source = Memcache;
-
+    // LOADCACHEISD
     SetEphemerisTime(p_cacheTime[0]);
   }
 
