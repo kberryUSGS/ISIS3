@@ -26,7 +26,7 @@ for (lbl in labels) {
                     """
                   }
                   
-                  def status = sh """
+                  sh """
                      ${condaPath}/bin/conda config --set always_yes True
                      ${condaPath}/bin/conda config --set ssl_verify false
                      ${condaPath}/bin/conda config --env --add channels conda-forge
