@@ -26,7 +26,7 @@ for (lbl in labels) {
                     """
                   }
                   
-                  sh """
+                  def status = sh """
                      ${condaPath}/bin/conda config --set always_yes True
                      ${condaPath}/bin/conda config --set ssl_verify false
                      ${condaPath}/bin/conda config --env --add channels conda-forge
@@ -35,7 +35,7 @@ for (lbl in labels) {
                      ${condaPath}/bin/conda create -n isis -c usgs-astrogeology isis=${ISIS_VERSION}
 
                      export ISISROOT=${condaPath}/envs/isis/
-                     ${condaPath}/bin/conda run -n isis campt -HELP
+                     ${condaPath}/bin/conda run -n isis campt -HELP || exit 1
                   """
 
                   // skip build for centos
