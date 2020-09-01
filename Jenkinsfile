@@ -35,7 +35,7 @@ for (lbl in labels) {
                      ${condaPath}/bin/conda create -n isis -c usgs-astrogeology isis=${ISIS_VERSION}
 
                      export ISISROOT=${condaPath}/envs/isis/
-                     ${condaPath}/bin/conda run -n isis campt -HELP || exit 1
+                     ${condaPath}/bin/conda run -n isis campt -HELP 
                   """
 
                   // skip build for centos
@@ -44,6 +44,7 @@ for (lbl in labels) {
 
                     sh """
                       git checkout dev 
+                      git log -n 5
                       cd recipe 
                       ${condaPath}/bin/conda install conda-build
                       ${condaPath}/bin/conda build . --no-anaconda-upload  
