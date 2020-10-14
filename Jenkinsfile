@@ -47,6 +47,7 @@ for (lbl in labels) {
                       git log -n 5
                       cd recipe 
                       ${condaPath}/bin/conda install conda-build
+                      export KAKADU_INCLUDE_DIR=/isisData/kakadu/
                       ${condaPath}/bin/conda build . --no-anaconda-upload  
                     """
                   }
