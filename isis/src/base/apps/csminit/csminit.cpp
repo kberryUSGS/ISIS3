@@ -31,12 +31,13 @@ namespace Isis {
    */
   void csminit(UserInterface &ui, Pvl *log) {
     //TESTING LOAD USGSCSM
-    QLibrary usgscsm("/Users/jmapel/miniconda3/envs/isis4_build/lib/libusgscsm.dylib");
+    QLibrary usgscsm("/home/kberry/anaconda3/envs/temp/lib/usgscsm");
     if (usgscsm.load()) {
       std::cout << "Successfully loaded usgscsm" << std::endl;
     }
     else {
       std::cout << "Failed to load usgscsm" << std::endl;
+      std::cout << usgscsm.errorString() << std::endl; 
     }
     //END TESTING
     // We are not processing the image data, so this process object is just for

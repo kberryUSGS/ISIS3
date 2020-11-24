@@ -7,6 +7,7 @@
 #include <string>
 
 #include "Blob.h"
+#include "FileName.h"
 
 namespace Isis {
   /**
@@ -25,6 +26,7 @@ namespace Isis {
       StringBlob();
       StringBlob(const QString &file);
       StringBlob(std::string str, QString name);
+      StringBlob(std::string str, QString name, FileName filename);
       ~StringBlob();
 
       std::string string() {

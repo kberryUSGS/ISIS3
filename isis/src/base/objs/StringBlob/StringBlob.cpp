@@ -33,6 +33,17 @@ namespace Isis {
     m_string = str;
   }
 
+
+  /**
+   * Constructor for creating a string blob with a standard string
+   *
+   * @param string String to read/write from the cube.
+   */
+  StringBlob::StringBlob(std::string str, QString name, FileName file) : Isis::Blob(name, QString("String"), file.expanded()) {
+    m_string = str;
+  }
+
+
   // Destructor
   StringBlob::~StringBlob() {
   }
