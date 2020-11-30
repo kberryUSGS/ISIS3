@@ -26,7 +26,7 @@ namespace Isis {
       StringBlob();
       StringBlob(const QString &file);
       StringBlob(std::string str, QString name);
-      StringBlob(std::string str, QString name, FileName filename);
+      StringBlob(QString name, FileName filename);
       ~StringBlob();
 
       std::string string() {

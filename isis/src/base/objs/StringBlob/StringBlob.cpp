@@ -9,7 +9,7 @@ namespace Isis {
   /**
    * Constructor for creating an string blob with no arguments
    */
-  StringBlob::StringBlob() : Isis::Blob("IsisCube", "String") {
+  StringBlob::StringBlob() : Isis::Blob("CSMState", "String") {
     m_string = "";
   }
 
@@ -20,7 +20,7 @@ namespace Isis {
    * @param file File to read labels from
    */
   StringBlob::StringBlob(const QString &file) :
-    Isis::Blob("IsisCube", "String") {
+    Isis::Blob("CSMState", "String") {
     Blob::Read(file);
   }
 
@@ -39,8 +39,7 @@ namespace Isis {
    *
    * @param string String to read/write from the cube.
    */
-  StringBlob::StringBlob(std::string str, QString name, FileName file) : Isis::Blob(name, QString("String"), file.expanded()) {
-    m_string = str;
+  StringBlob::StringBlob(QString name, FileName file) : Isis::Blob(name, QString("String"), file.expanded()) {
   }
 
 
