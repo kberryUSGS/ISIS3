@@ -43,7 +43,7 @@ for (lbl in labels) {
                     checkout scm
 
                     sh """
-                      git checkout dev 
+                      git checkout 4.3 
                       git log -n 5
                       cd recipe 
                       ${condaPath}/bin/conda install conda-build
