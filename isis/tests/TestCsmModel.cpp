@@ -1,7 +1,10 @@
 #include "TestCsmModel.h"
+
+#include <QString>
 #include <fstream>
 #include <iostream>
 #include <nlohmann/json.hpp>
+
 using json = nlohmann::json;
 
 TestCsmModel::TestCsmModel() {
@@ -69,7 +72,17 @@ std::string TestCsmModel::getModelState() const {
 }
 
 void TestCsmModel::replaceModelState(const std::string& argState) {
-  m_modelState = argState;
+//  QString state(argState);
+//  if (state.contains("name") && state.contains("test_param_one") && 
+//      state.contains("test_param_two")) {
+    m_modelState = argState; 
+/*  }
+  else {
+    csm::Error::ErrorType errorType = csm::Error::INVALID_SENSOR_MODEL_STATE;
+    std::string msg = "Could not replace model state for TestCsmModel";
+    std::string func = "TestCmsModel::replaceModelState";
+    throw csm::Error(errorType, msg, func);
+  }*/
 }
 
 std::string TestCsmModel::constructStateFromIsd(const csm::Isd isd){
@@ -77,7 +90,10 @@ std::string TestCsmModel::constructStateFromIsd(const csm::Isd isd){
   std::ifstream isdFile(filename);
 
   if (isdFile.fail()) {
-    std::cout << "Could not open file: " << filename << std::endl;
+    csm::Error::ErrorType errorType = csm::Error::FILE_READ;
+    std::string msg = "Could not open ISD file";
+    std::string func = "TestCsmModel::constructStateFromIsd";
+    throw csm::Error(errorType, msg, func);
   }
 
   json parsedIsd;

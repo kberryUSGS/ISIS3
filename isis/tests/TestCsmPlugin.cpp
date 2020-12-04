@@ -110,9 +110,11 @@ std::string TestCsmPlugin::getModelNameFromModelState(
 csm::Model* TestCsmPlugin::constructModelFromState(
       const std::string& modelState,
       csm::WarningList* warnings) const {
+  // Just construct a TestCsmModel for this, since
+  // it has a subset of the AlternativeTestCsmModel requirements
+  // and the test ISD/state don't specify a model it in
   TestCsmModel *model = new TestCsmModel();
   model->replaceModelState(modelState);
-  // Left simple because this isn't needed by current tests.
   return model;
 }
 
